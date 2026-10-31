@@ -1,0 +1,31 @@
+.tree-list {
+  list-style: none;
+  padding-left: 10px;
+  margin: 0;
+  font-family: 'Manrope', sans-serif;
+}
+
+.tree-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #a8b0c8;
+  transition: background 0.2s, color 0.2s;
+
+  &:hover {
+    background: rgba(106, 169, 255, 0.1);
+    color: #eef2ff;
+  }
+
+  .icon { font-size: 14px; }
+  .name { font-size: 14px; }
+}
+
+.nested {
+  padding-left: 16px;
+  border-left: 1px solid rgba(80, 90, 140, 0.25);
+  margin-left: 8px;
+}

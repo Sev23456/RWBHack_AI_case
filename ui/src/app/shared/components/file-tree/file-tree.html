@@ -1,0 +1,26 @@
+<ul class="tree-list">
+  @for (node of nodes; track node.path) {
+    <li>
+      <div class="tree-item" (click)="toggleFolder(node)">
+        <span class="icon">
+          @if (node.type === 'folder') {
+            {{ node.isExpanded ? '📂' : '📁' }}
+          } @else {
+            📄
+          }
+        </span>
+        <span class="name">{{ node.name }}</span>
+      </div>
+
+      <!-- Рекурсивный вызов компонента для дочерних элементов -->
+      @if (node.type === 'folder' && node.isExpanded && node.children) {
+        <div class="nested">
+          <app-file-tree
+            [nodes]="node.children"
+            (fileClicked)="fileClicked.emit($event)">
+          </app-file-tree>
+        </div>
+      }
+    </li>
+  }
+</ul>
