@@ -1,0 +1,32 @@
+<mat-sidenav-container class="app-shell">
+  <mat-sidenav mode="side" opened class="sidenav">
+    <div class="brand">
+      <div class="logo">AI</div>
+      <div class="brand-text">
+        <strong>Russtech</strong>
+        <span>AI Pipeline</span>
+      </div>
+    </div>
+
+    <mat-nav-list>
+      <a mat-list-item routerLink="/generator" routerLinkActive="active-link">
+        <mat-icon>auto_awesome</mat-icon> Генератор
+      </a>
+      <!-- Заглушки для будущих страниц -->
+      <a mat-list-item routerLink="/demo/dashboard" routerLinkActive="active-link">
+        <mat-icon>dashboard</mat-icon> Демо-макет кейса
+      </a>
+    </mat-nav-list>
+  </mat-sidenav>
+
+  <mat-sidenav-content>
+    <mat-toolbar class="topbar">
+      <span>Агентский пайплайн: от требований к коду</span>
+      <span class="spacer"></span>
+      <button mat-icon-button><mat-icon>settings</mat-icon></button>
+    </mat-toolbar>
+    <main>
+      <router-outlet></router-outlet>
+    </main>
+  </mat-sidenav-content>
+</mat-sidenav-container>
