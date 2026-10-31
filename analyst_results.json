@@ -1,0 +1,2858 @@
+[
+ {
+  "id": 1,
+  "theme": "Парковочный помощник (базовый кейс из PDF)",
+  "text": "Сотрудники технических служб выполняют работы на объектах СПб на служебных авто. Нужен мобильный помощник на Kotlin, который определяет нахождение автомобиля в зоне платной парковки, отслеживает активную сессию, предупреждает за 10 минут до окончания, уведомляет о въезде в новую зону. Бэкенд C# 14 / ASP.NET 10, Angular 20.1.6 для админки, PostgreSQL 17.9 + PostGIS, Kafka, Docker, GitLab CI/CD.",
+  "seconds": 48.0,
+  "answer": {
+   "success": true,
+   "data": {
+    "project_name": "SPb Service Fleet Parking Assistant",
+    "domain": "Micromobility / Fleet Management",
+    "description": "Система мониторинга и предупреждений для служебных автомобилей технических служб в Санкт-Петербурге. Мобильное приложение на Kotlin определяет нахождение автомобиля в зоне платной парковки, отслеживает активную парковочную сессию, отправляет предупреждения за 10 минут до её окончания и уведомления о въезде в новую зону. Административная панель на Angular позволяет управлять зоной платной парковки, служебным транспортом и получать статистическую информацию.",
+    "user_stories": [
+     {
+      "role": "Сотрудник технических служб",
+      "action": "открывает мобильное приложение на служебном автомобиле",
+      "so_that": "система автоматически определяет нахождение автомобиля в зоне платной парковки"
+     },
+     {
+      "role": "Сотрудник технических служб",
+      "action": "паркует автомобиль в зоне платной парковки",
+      "so_that": "система отслеживает активную сессию и предупреждает за 10 минут до окончания"
+     },
+     {
+      "role": "Сотрудник технических служб",
+      "action": "въезжает в новую зону платной парковки",
+      "so_that": "получает уведомление о смене зоны"
+     },
+     {
+      "role": "Администратор",
+      "action": "управляет границами зон платной парковки через административную панель",
+      "so_that": "система корректно определяет нахождение автомобилей в актуальных зонах"
+     },
+     {
+      "role": "Администратор",
+      "action": "просматривает историю парковочных сессий служебного транспорта",
+      "so_that": "контролирует соблюдение правил парковки и оптимизирует работу технических служб"
+     }
+    ],
+    "entities": [
+     {
+      "name": "ParkingZone",
+      "description": "Зона платной парковки в Санкт-Петербурге",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Идентификатор зоны"
+       },
+       {
+        "name": "name",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Название зоны"
+       },
+       {
+        "name": "geometry",
+        "type": "GEOMETRY(Polygon, 4326)",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Географические границы зоны"
+       },
+       {
+        "name": "tariff_per_hour",
+        "type": "DECIMAL",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Тариф за час парковки"
+       },
+       {
+        "name": "max_duration_minutes",
+        "type": "INTEGER",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Максимальная длительность сессии в минутах"
+       }
+      ]
+     },
+     {
+      "name": "ServiceVehicle",
+      "description": "Служебный автомобиль технических служб",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Идентификатор автомобиля"
+       },
+       {
+        "name": "plate_number",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Государственный регистрационный номер"
+       },
+       {
+        "name": "current_location",
+        "type": "GEOMETRY(Point, 4326)",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": true,
+        "description": "Текущее местоположение GPS"
+       },
+       {
+        "name": "status",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Статус: active, parked, maintenance"
+       }
+      ]
+     },
+     {
+      "name": "ParkingSession",
+      "description": "Активная парковочная сессия служебного автомобиля",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Идентификатор сессии"
+       },
+       {
+        "name": "vehicle_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": false,
+        "description": "Ссылка на ServiceVehicle"
+       },
+       {
+        "name": "zone_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": false,
+        "description": "Ссылка на ParkingZone"
+       },
+       {
+        "name": "start_time",
+        "type": "TIMESTAMP",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Время начала сессии"
+       },
+       {
+        "name": "end_time",
+        "type": "TIMESTAMP",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": true,
+        "description": "Время окончания сессии"
+       },
+       {
+        "name": "warning_sent",
+        "type": "BOOLEAN",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Отправлено ли предупреждение за 10 минут"
+       }
+      ]
+     },
+     {
+      "name": "ZoneChangeNotification",
+      "description": "Уведомление о въезде в новую зону",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Идентификатор уведомления"
+       },
+       {
+        "name": "vehicle_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": false,
+        "description": "Ссылка на ServiceVehicle"
+       },
+       {
+        "name": "previous_zone_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": true,
+        "description": "Предыдущая зона"
+       },
+       {
+        "name": "new_zone_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": false,
+        "description": "Новая зона"
+       },
+       {
+        "name": "notification_time",
+        "type": "TIMESTAMP",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Время уведомления"
+       }
+      ]
+     }
+    ],
+    "api_endpoints": [
+     {
+      "method": "GET",
+      "path": "/api/vehicles/{vehicleId}/location",
+      "description": "Получить текущее местоположение служебного автомобиля",
+      "request_body": null,
+      "response_type": "VehicleLocation"
+     },
+     {
+      "method": "POST",
+      "path": "/api/vehicles/{vehicleId}/location",
+      "description": "Обновить текущее местоположение служебного автомобиля",
+      "request_body": "{latitude: float, longitude: float, timestamp: string}",
+      "response_type": "LocationUpdateResult"
+     },
+     {
+      "method": "GET",
+      "path": "/api/sessions/active?vehicle_id={vehicleId}",
+      "description": "Получить активную парковочную сессию автомобиля",
+      "request_body": null,
+      "response_type": "ParkingSession"
+     },
+     {
+      "method": "POST",
+      "path": "/api/sessions/start",
+      "description": "Начать новую парковочную сессию",
+      "request_body": "{vehicle_id: string, zone_id: string, location: {latitude: float, longitude: float}}",
+      "response_type": "ParkingSession"
+     },
+     {
+      "method": "POST",
+      "path": "/api/sessions/{sessionId}/end",
+      "description": "Завершить парковочную сессию",
+      "request_body": "{end_location: {latitude: float, longitude: float}}",
+      "response_type": "SessionEndResult"
+     },
+     {
+      "method": "GET",
+      "path": "/api/zones",
+      "description": "Получить список всех зон платной парковки",
+      "request_body": null,
+      "response_type": "ParkingZone[]"
+     },
+     {
+      "method": "POST",
+      "path": "/api/zones",
+      "description": "Создать новую зону платной парковки",
+      "request_body": "{name: string, geometry: GeoJSON, tariff_per_hour: float, max_duration_minutes: int}",
+      "response_type": "ParkingZone"
+     },
+     {
+      "method": "PUT",
+      "path": "/api/zones/{zoneId}",
+      "description": "Обновить границы зоны платной парковки",
+      "request_body": "{name: string, geometry: GeoJSON, tariff_per_hour: float, max_duration_minutes: int}",
+      "response_type": "ParkingZone"
+     },
+     {
+      "method": "POST",
+      "path": "/api/notifications",
+      "description": "Отправить уведомление о въезде в новую зону",
+      "request_body": "{vehicle_id: string, previous_zone_id: string, new_zone_id: string, message: string}",
+      "response_type": "NotificationResult"
+     }
+    ],
+    "kafka_topics": [
+     {
+      "topic_name": "vehicle_location_updates",
+      "description": "Потоковые обновления местоположения служебных автомобилей",
+      "payload_schema": {
+       "vehicle_id": "string",
+       "latitude": "float",
+       "longitude": "float",
+       "timestamp": "string"
+      }
+     },
+     {
+      "topic_name": "parking_session_events",
+      "description": "События жизненного цикла парковочных сессий",
+      "payload_schema": {
+       "session_id": "string",
+       "vehicle_id": "string",
+       "zone_id": "string",
+       "event_type": "string",
+       "timestamp": "string"
+      }
+     },
+     {
+      "topic_name": "zone_change_alerts",
+      "description": "Уведомления о смене зон парковки",
+      "payload_schema": {
+       "vehicle_id": "string",
+       "previous_zone_id": "string",
+       "new_zone_id": "string",
+       "alert_time": "string"
+      }
+     }
+    ],
+    "constraints": {
+     "stack": {
+      "backend": "C# 14 / ASP.NET 10",
+      "frontend": "Angular 20.1.6",
+      "mobile": "Kotlin",
+      "database": "PostgreSQL 17.9 + PostGIS",
+      "messaging": "Kafka",
+      "infrastructure": "Docker",
+      "ci_cd": "GitLab CI/CD"
+     },
+     "geo": "Zones of paid parking in St. Petersburg with geofencing",
+     "external_services": []
+    },
+    "acceptance_criteria": [
+     "Мобильное приложение на Kotlin определяет нахождение автомобиля в зоне платной парковки с точностью до 10 метров",
+     "Система отслеживает активную парковочную сессию и автоматически предупреждает сотрудника за 10 минут до окончания сессии",
+     "При въезде автомобиля в новую зону платной парковки сотрудник получает уведомление «Въезд в новую зону» в течение 30 секунд",
+     "ST_Contains(zone.geometry, vehicle.current_location) используется для определения нахождение автомобиля в зоне и выполняется менее чем за 50 мс",
+     "ST_Distance(vehicle.current_location, zone.center) используется для проверки близости к границе зоны с точностью до 50 метров",
+     "Обновление местоположения автомобиля в Kafka публикуется в течение 100 мс от получения данных от GPS",
+     "API /api/sessions/active возвращает активную сессию автомобиля менее чем за 200 мс p95",
+     "Административная панель на Angular позволяет управлять границами зон с использованием интерактивной карты",
+     "История парковочных сессий доступна в админке с фильтрацией по дате, автомобилю и зоне",
+     "Данные о зонах платной парковки хранятся в PostGIS с пространственным индексом для оптимизации запросов",
+     "Предупреждение за 10 минут до окончания сессии отправляется через push-уведомления на мобильное устройство сотрудника",
+     "Система корректно обрабатывает ситуации, когда автомобиль находится на границе двух зон платной парковки",
+     "Все события парковочных сессий публикуются в Kafka в формате Avro для обеспечения совместимости данных"
+    ]
+   },
+   "attempts": 1,
+   "error": null
+  }
+ },
+ {
+  "id": 2,
+  "theme": "Служба доставки еды",
+  "text": "Нужен сервис доставки еды. Клиентское мобильное приложение на Kotlin, где можно выбрать ресторан, собрать корзину и оплатить. Админка на Angular для ресторанов (управление меню, заказами). Бэкенд на ASP.NET 10 Core. PostgreSQL для хранения заказов и пользователей. Kafka для событий заказа (создан, оплачен, доставлен). Docker Compose для развертывания, CI/CD через GitLab.",
+  "seconds": 36.6,
+  "answer": {
+   "success": true,
+   "data": {
+    "project_name": "FoodDelivery Service",
+    "domain": "Food Delivery",
+    "description": "Платформа доставки еды, включающая клиентское мобильное приложение для выбора ресторана, формирования корзины и оплаты, административный интерфейс для ресторанов для управления меню и заказами, а также бэкенд и событийную шину для обработки жизненного цикла заказов.",
+    "user_stories": [
+     {
+      "role": "Client",
+      "action": "selects a restaurant",
+      "so_that": "can view its menu"
+     },
+     {
+      "role": "Client",
+      "action": "builds a cart",
+      "so_that": "can order multiple items"
+     },
+     {
+      "role": "Client",
+      "action": "pays for the order",
+      "so_that": "the order is confirmed and processing starts"
+     },
+     {
+      "role": "Restaurant Admin",
+      "action": "manages the menu",
+      "so_that": "items are up-to-date and available"
+     },
+     {
+      "role": "Restaurant Admin",
+      "action": "views and updates order statuses",
+      "so_that": "clients receive accurate delivery progress"
+     },
+     {
+      "role": "System",
+      "action": "publishes order events (created, paid, delivered)",
+      "so_that": "external systems stay in sync"
+     }
+    ],
+    "entities": [
+     {
+      "name": "User",
+      "description": "Registered customer of the delivery service",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Primary key"
+       },
+       {
+        "name": "name",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Customer full name"
+       },
+       {
+        "name": "phone",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Contact phone number"
+       },
+       {
+        "name": "address",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": true,
+        "description": "Default delivery address"
+       }
+      ]
+     },
+     {
+      "name": "Restaurant",
+      "description": "Food establishment participating in the platform",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Primary key"
+       },
+       {
+        "name": "name",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Restaurant name"
+       },
+       {
+        "name": "address",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Restaurant location"
+       },
+       {
+        "name": "is_active",
+        "type": "BOOLEAN",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Availability flag"
+       }
+      ]
+     },
+     {
+      "name": "MenuItem",
+      "description": "Dish or product offered by a restaurant",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Primary key"
+       },
+       {
+        "name": "restaurant_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": false,
+        "description": "FK to Restaurant"
+       },
+       {
+        "name": "name",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Item name"
+       },
+       {
+        "name": "price",
+        "type": "DECIMAL",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Item price"
+       },
+       {
+        "name": "is_available",
+        "type": "BOOLEAN",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Availability for ordering"
+       }
+      ]
+     },
+     {
+      "name": "Order",
+      "description": "A customer's request to buy items from a restaurant",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Primary key"
+       },
+       {
+        "name": "user_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": false,
+        "description": "FK to User"
+       },
+       {
+        "name": "restaurant_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": false,
+        "description": "FK to Restaurant"
+       },
+       {
+        "name": "status",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Current status: created, paid, delivered"
+       },
+       {
+        "name": "total_amount",
+        "type": "DECIMAL",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Total cost of the order"
+       },
+       {
+        "name": "created_at",
+        "type": "TIMESTAMP",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Creation date and time"
+       },
+       {
+        "name": "updated_at",
+        "type": "TIMESTAMP",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": true,
+        "description": "Last modification date and time"
+       }
+      ]
+     },
+     {
+      "name": "OrderItem",
+      "description": "A specific product line within an order",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Primary key"
+       },
+       {
+        "name": "order_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": false,
+        "description": "FK to Order"
+       },
+       {
+        "name": "menu_item_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": false,
+        "description": "FK to MenuItem"
+       },
+       {
+        "name": "quantity",
+        "type": "INTEGER",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Number of items"
+       },
+       {
+        "name": "price",
+        "type": "DECIMAL",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Price per unit at time of order"
+       }
+      ]
+     }
+    ],
+    "api_endpoints": [
+     {
+      "method": "GET",
+      "path": "/api/restaurants",
+      "description": "Get list of active restaurants",
+      "request_body": null,
+      "response_type": "List<Restaurant>"
+     },
+     {
+      "method": "GET",
+      "path": "/api/restaurants/{id}/menu",
+      "description": "Get menu items for a specific restaurant",
+      "request_body": null,
+      "response_type": "List<MenuItem>"
+     },
+     {
+      "method": "POST",
+      "path": "/api/orders",
+      "description": "Create a new order from the cart",
+      "request_body": "{user_id: string, restaurant_id: string, items: [{menu_item_id: string, quantity: int}], delivery_address: string}",
+      "response_type": "Order"
+     },
+     {
+      "method": "POST",
+      "path": "/api/orders/{id}/pay",
+      "description": "Confirm payment for an order",
+      "request_body": "{payment_method: string, transaction_id: string}",
+      "response_type": "OrderStatus"
+     },
+     {
+      "method": "PATCH",
+      "path": "/api/orders/{id}/status",
+      "description": "Update order status (e.g., to delivered by admin)",
+      "request_body": "{status: string}",
+      "response_type": "OrderStatus"
+     },
+     {
+      "method": "PUT",
+      "path": "/api/restaurants/{id}/menu",
+      "description": "Update or create menu items for a restaurant",
+      "request_body": "{items: [{name: string, price: decimal, is_available: bool, id?: string}]}",
+      "response_type": "List<MenuItem>"
+     },
+     {
+      "method": "GET",
+      "path": "/api/admin/orders?restaurant_id={id}",
+      "description": "Get all orders for a specific restaurant",
+      "request_body": null,
+      "response_type": "List<Order>"
+     }
+    ],
+    "kafka_topics": [
+     {
+      "topic_name": "order_events",
+      "description": "Stream of order lifecycle events",
+      "payload_schema": {
+       "order_id": "string",
+       "event_type": "string",
+       "timestamp": "string",
+       "status": "string",
+       "total_amount": "number"
+      }
+     }
+    ],
+    "constraints": {
+     "stack": {
+      "backend": "ASP.NET 10 Core",
+      "frontend": "Angular",
+      "mobile": "Kotlin",
+      "database": "PostgreSQL",
+      "messaging": "Kafka",
+      "infrastructure": "Docker Compose",
+      "ci_cd": "GitLab CI/CD"
+     },
+     "geo": "null",
+     "external_services": []
+    },
+    "acceptance_criteria": [
+     "Client can select a restaurant from the mobile app and view its menu",
+     "Client can add items to a cart and finalize an order with a delivery address",
+     "Client can pay for the order and receive confirmation",
+     "Restaurant Admin can view, add, and update menu items in the admin panel",
+     "Restaurant Admin can track and change order statuses in the admin panel",
+     "An event of type 'created' is published to Kafka when an order is first submitted",
+     "An event of type 'paid' is published to Kafka when payment is confirmed",
+     "An event of type 'delivered' is published to Kafka when the delivery is completed",
+     "Order data is persisted in PostgreSQL, including all order items and status changes",
+     "The entire stack can be deployed and run locally using Docker Compose",
+     "CI/CD pipeline in GitLab successfully builds and deploys backend, frontend, and mobile artifacts"
+    ]
+   },
+   "attempts": 1,
+   "error": null
+  }
+ },
+ {
+  "id": 3,
+  "theme": "Трекер привычек",
+  "text": "Мобильное приложение-трекер привычек на Kotlin. Пользователь создает привычку, отмечает выполнение, видит статистику (streak, графики). Синхронизация с бэкендом на ASP.NET 10 Core, БД PostgreSQL. Админка на Angular для просмотра статистики по пользователям. Push-уведомления о напоминаниях. Docker-окружение и CI/CD.",
+  "seconds": 37.9,
+  "answer": {
+   "success": true,
+   "data": {
+    "project_name": "HabitTrackerPro",
+    "domain": "Habit Tracking / Personal Productivity",
+    "description": "Мобильное приложение на Kotlin для отслеживания привычек, которое позволяет пользователям создавать, отмечать выполнение и анализировать свою статистику. Система обеспечивает синхронизацию данных с сервером ASP.NET Core, хранит информацию в PostgreSQL, предоставляет административную панель на Angular для аналитики и отправляет push-уведомления о напоминаниях.",
+    "user_stories": [
+     {
+      "role": "Пользователь",
+      "action": "создает новую привычку",
+      "so_that": "может отслеживать её выполнение ежедневно"
+     },
+     {
+      "role": "Пользователь",
+      "action": "отмечает выполнение привычки",
+      "so_that": "фиксирует прогресс и увеличивает текущий streak"
+     },
+     {
+      "role": "Пользователь",
+      "action": "просматривает статистику",
+      "so_that": "видит свои streak и графики выполнения"
+     },
+     {
+      "role": "Пользователь",
+      "action": "получает push-уведомление",
+      "so_that": "не forgets о напоминании по привычке"
+     },
+     {
+      "role": "Администратор",
+      "action": "просматривает статистику по пользователям",
+      "so_that": "анализирует активность в системе"
+     }
+    ],
+    "entities": [
+     {
+      "name": "User",
+      "description": "Записанный пользователь системы",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Уникальный идентификатор пользователя"
+       },
+       {
+        "name": "username",
+        "type": "VARCHAR(50)",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Имя пользователя"
+       },
+       {
+        "name": "email",
+        "type": "VARCHAR(255)",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Email для входа и уведомлений"
+       },
+       {
+        "name": "created_at",
+        "type": "TIMESTAMP",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Дата регистрации"
+       }
+      ]
+     },
+     {
+      "name": "Habit",
+      "description": "Привычка пользователя",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Уникальный идентификатор привычки"
+       },
+       {
+        "name": "user_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": false,
+        "description": "Идентификатор владельца"
+       },
+       {
+        "name": "title",
+        "type": "VARCHAR(100)",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Название привычки"
+       },
+       {
+        "name": "created_at",
+        "type": "TIMESTAMP",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Дата создания"
+       }
+      ]
+     },
+     {
+      "name": "HabitCompletion",
+      "description": "Запись о выполнении привычки",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Уникальный идентификатор записи"
+       },
+       {
+        "name": "habit_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": false,
+        "description": "Идентификатор привычки"
+       },
+       {
+        "name": "completed_date",
+        "type": "DATE",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Дата выполнения"
+       },
+       {
+        "name": "created_at",
+        "type": "TIMESTAMP",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Время создания записи"
+       }
+      ]
+     },
+     {
+      "name": "Notification",
+      "description": "Настройка напоминаний и push-уведомлений",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Уникальный идентификатор уведомления"
+       },
+       {
+        "name": "user_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": false,
+        "description": "Идентификатор пользователя"
+       },
+       {
+        "name": "habit_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": true,
+        "description": "Связанная привычка"
+       },
+       {
+        "name": "message",
+        "type": "VARCHAR(255)",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Текст напоминания"
+       },
+       {
+        "name": "sent_at",
+        "type": "TIMESTAMP",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Время отправки"
+       }
+      ]
+     }
+    ],
+    "api_endpoints": [
+     {
+      "method": "POST",
+      "path": "/api/auth/register",
+      "description": "Регистрация нового пользователя",
+      "request_body": "{username: string, email: string, password: string}",
+      "response_type": "AuthToken"
+     },
+     {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "description": "Вход пользователя",
+      "request_body": "{email: string, password: string}",
+      "response_type": "AuthToken"
+     },
+     {
+      "method": "POST",
+      "path": "/api/habits",
+      "description": "Создание новой привычки",
+      "request_body": "{title: string}",
+      "response_type": "Habit"
+     },
+     {
+      "method": "GET",
+      "path": "/api/habits",
+      "description": "Получение списка привычек пользователя",
+      "request_body": null,
+      "response_type": "Habit[]"
+     },
+     {
+      "method": "POST",
+      "path": "/api/habits/{habitId}/complete",
+      "description": "Отметить выполнение привычки",
+      "request_body": "{completed_date: string}",
+      "response_type": "HabitCompletion"
+     },
+     {
+      "method": "GET",
+      "path": "/api/habits/{habitId}/statistics",
+      "description": "Получение статистики по привычке (streak, графики)",
+      "request_body": null,
+      "response_type": "HabitStatistics"
+     },
+     {
+      "method": "POST",
+      "path": "/api/notifications/push-token",
+      "description": "Регистрация push-токена устройства",
+      "request_body": "{device_token: string}",
+      "response_type": "void"
+     },
+     {
+      "method": "GET",
+      "path": "/api/admin/users/statistics",
+      "description": "Получение статистики по всем пользователям",
+      "request_body": null,
+      "response_type": "UserStatistics[]"
+     }
+    ],
+    "kafka_topics": [],
+    "constraints": {
+     "stack": {
+      "backend": "ASP.NET Core",
+      "frontend": "Angular",
+      "mobile": "Kotlin",
+      "database": "PostgreSQL",
+      "messaging": null,
+      "infrastructure": "Docker",
+      "ci_cd": "CI/CD"
+     },
+     "geo": "География не требуется",
+     "external_services": [
+      "FCM - Firebase Cloud Messaging"
+     ]
+    },
+    "acceptance_criteria": [
+     "Пользователь может создать привычку и увидеть её в списке",
+     "Отметка выполнения обновляет текущий streak для привычки",
+     "Статистика включает текущий streak, максимальный streak и данные для графиков",
+     "Push-уведомление доставляется на устройство по времени напоминания",
+     "Администратор видит сводную статистику по активности пользователей",
+     "Данные приложения синхронизируются с бэкендом при наличии сети",
+     "Система разворачивается в Docker-окружении",
+     "CI/CD pipeline автоматически тестирует и разворачивает код"
+    ]
+   },
+   "attempts": 1,
+   "error": null
+  }
+ },
+ {
+  "id": 4,
+  "theme": "Система умного дома",
+  "text": "Платформа умного дома. Мобильное приложение на Kotlin для управления устройствами (свет, термостат, розетки). Бэкенд ASP.NET 10 Core принимает телеметрию от устройств через REST API и Kafka. Хранение данных в PostgreSQL + PostGIS (для геолокации устройств). Веб-админка на Angular для мониторинга состояния устройств и создания сценариев автоматизации. Docker + GitLab CI/CD.",
+  "seconds": 53.4,
+  "answer": {
+   "success": true,
+   "data": {
+    "project_name": "SmartHome Platform",
+    "domain": "Smart Home / IoT",
+    "description": "Комплексная платформа управления умным домом, которая позволяет пользователям контролировать свет, термостат и розетки через мобильное приложение. Система собирает телеметрию от устройств через REST API и Kafka, хранит данные и геолокацию в PostgreSQL с PostGIS, а также предоставляет веб-интерфейс для администраторов для мониторинга состояния и создания сценариев автоматизации.",
+    "user_stories": [
+     {
+      "role": "User",
+      "action": "manages light, thermostat, and outlets from the mobile app",
+      "so_that": "can control home devices remotely"
+     },
+     {
+      "role": "System",
+      "action": "receives device telemetry via REST API and Kafka",
+      "so_that": "maintains real-time device state and history"
+     },
+     {
+      "role": "System",
+      "action": "stores device geolocation using PostGIS",
+      "so_that": "supports location-based queries and mapping"
+     },
+     {
+      "role": "Admin",
+      "action": "monitors device status in the Angular web admin",
+      "so_that": "quickly identifies failures or abnormal readings"
+     },
+     {
+      "role": "Admin",
+      "action": "creates automation scenarios",
+      "so_that": "devices act automatically based on conditions"
+     }
+    ],
+    "entities": [
+     {
+      "name": "User",
+      "description": "Registered user of the smart home platform",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "PK"
+       },
+       {
+        "name": "email",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Contact email"
+       },
+       {
+        "name": "full_name",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": true,
+        "description": "User full name"
+       },
+       {
+        "name": "phone",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": true,
+        "description": "Contact phone"
+       }
+      ]
+     },
+     {
+      "name": "Device",
+      "description": "Physical smart home device: light, thermostat, or outlet",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "PK"
+       },
+       {
+        "name": "user_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": false,
+        "description": "FK to User"
+       },
+       {
+        "name": "type",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Device type: light, thermostat, outlet"
+       },
+       {
+        "name": "name",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Device display name"
+       },
+       {
+        "name": "state",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Current on/off or mode state"
+       },
+       {
+        "name": "location",
+        "type": "GEOMETRY(Point, 4326)",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": true,
+        "description": "Device geolocation"
+       }
+      ]
+     },
+     {
+      "name": "Telemetry",
+      "description": "Device measurement record",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "PK"
+       },
+       {
+        "name": "device_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": false,
+        "description": "FK to Device"
+       },
+       {
+        "name": "metric",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Metric name, e.g. temperature, power"
+       },
+       {
+        "name": "value",
+        "type": "NUMERIC",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Measured value"
+       },
+       {
+        "name": "unit",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": true,
+        "description": "Measurement unit"
+       },
+       {
+        "name": "created_at",
+        "type": "TIMESTAMPTZ",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Capture time"
+       }
+      ]
+     },
+     {
+      "name": "Scenario",
+      "description": "Automation scenario created by admin",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "PK"
+       },
+       {
+        "name": "user_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": false,
+        "description": "FK to User"
+       },
+       {
+        "name": "name",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Scenario display name"
+       },
+       {
+        "name": "trigger_type",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Trigger type, e.g. telemetry or schedule"
+       },
+       {
+        "name": "action",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Device action to execute"
+       },
+       {
+        "name": "is_active",
+        "type": "BOOLEAN",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Activation flag"
+       }
+      ]
+     }
+    ],
+    "api_endpoints": [
+     {
+      "method": "POST",
+      "path": "/api/telemetry",
+      "description": "Ingest device telemetry",
+      "request_body": "{\"device_id\": \"string\", \"metric\": \"string\", \"value\": \"number\", \"unit\": \"string\"}",
+      "response_type": "Telemetry"
+     },
+     {
+      "method": "POST",
+      "path": "/api/devices/{device_id}/command",
+      "description": "Send command to a device",
+      "request_body": "{\"command\": \"string\", \"value\": \"number\"}",
+      "response_type": "DeviceCommandResult"
+     },
+     {
+      "method": "GET",
+      "path": "/api/devices",
+      "description": "List devices for a user",
+      "request_body": "",
+      "response_type": "Device[]"
+     },
+     {
+      "method": "GET",
+      "path": "/api/devices/{device_id}/telemetry",
+      "description": "Retrieve telemetry history for a device",
+      "request_body": "",
+      "response_type": "Telemetry[]"
+     },
+     {
+      "method": "POST",
+      "path": "/api/scenarios",
+      "description": "Create automation scenario",
+      "request_body": "{\"user_id\": \"string\", \"name\": \"string\", \"trigger_type\": \"string\", \"action\": \"string\"}",
+      "response_type": "Scenario"
+     },
+     {
+      "method": "PUT",
+      "path": "/api/scenarios/{scenario_id}",
+      "description": "Update automation scenario",
+      "request_body": "{\"name\": \"string\", \"trigger_type\": \"string\", \"action\": \"string\", \"is_active\": \"boolean\"}",
+      "response_type": "Scenario"
+     }
+    ],
+    "kafka_topics": [
+     {
+      "topic_name": "device_telemetry",
+      "description": "Raw device telemetry stream",
+      "payload_schema": {
+       "device_id": "string",
+       "metric": "string",
+       "value": "number",
+       "unit": "string",
+       "timestamp": "string"
+      }
+     },
+     {
+      "topic_name": "device_commands",
+      "description": "Commands sent to devices",
+      "payload_schema": {
+       "device_id": "string",
+       "command": "string",
+       "value": "number",
+       "timestamp": "string"
+      }
+     },
+     {
+      "topic_name": "automation_events",
+      "description": "Events generated by automation scenarios",
+      "payload_schema": {
+       "scenario_id": "string",
+       "trigger_type": "string",
+       "action": "string",
+       "timestamp": "string"
+      }
+     }
+    ],
+    "constraints": {
+     "stack": {
+      "backend": "ASP.NET 10 Core",
+      "frontend": "Angular",
+      "mobile": "Kotlin",
+      "database": "PostgreSQL + PostGIS",
+      "messaging": "Kafka",
+      "infrastructure": "Docker",
+      "ci_cd": "GitLab CI/CD"
+     },
+     "geo": "Device geolocation stored and queried with PostGIS",
+     "external_services": []
+    },
+    "acceptance_criteria": [
+     "Device telemetry is accepted via POST /api/telemetry and published to Kafka within 200ms p95.",
+     "Device command API updates device state and returns result for light, thermostat, and outlet actions.",
+     "Device geolocation is stored as GEOMETRY(Point, 4326) and queried using PostGIS functions such as ST_Distance or ST_Contains.",
+     "Mobile app on Kotlin can send device commands and retrieve device status.",
+     "Web admin on Angular displays live device status and allows creating automation scenarios.",
+     "Dockerized services build and deploy successfully through GitLab CI/CD.",
+     "Kafka topics device_telemetry and device_commands carry payloads with device_id and timestamp.",
+     "All user requirements are covered in at least one acceptance criterion."
+    ]
+   },
+   "attempts": 3,
+   "error": null
+  }
+ },
+ {
+  "id": 5,
+  "theme": "Сервис аренды самокатов",
+  "text": "Кикшеринг самокатов. Мобильное приложение на Kotlin: карта с самокатами, сканирование QR-кода, старт/стоп поездки, оплата. Бэкенд ASP.NET 10 Core, PostgreSQL 17.9 + PostGIS для хранения координат и зон парковки. Kafka для событий поездок. Админка Angular для мониторинга парка самокатов и зарядки. Docker, GitLab CI/CD.",
+  "seconds": 13.8,
+  "answer": {
+   "success": true,
+   "data": {
+    "project_name": "KickScooter Pro",
+    "domain": "Micromobility / Ride-sharing",
+    "description": "Комплексная платформа кикшеринга, позволяющая пользователям находить и арендовать электросамокаты через мобильное приложение. Система включает геозонирование, биллинг и администрирование парка.",
+    "user_stories": [
+     {
+      "role": "Rider",
+      "action": "scans QR code on scooter",
+      "so_that": "unlocks the device for a trip"
+     },
+     {
+      "role": "Admin",
+      "action": "views battery levels on map",
+      "so_that": "plans charging routes efficiently"
+     },
+     {
+      "role": "System",
+      "action": "checks geofence on ride end",
+      "so_that": "applies fines for illegal parking"
+     }
+    ],
+    "entities": [
+     {
+      "name": "User",
+      "description": "Registered customer",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "PK"
+       },
+       {
+        "name": "email",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Contact"
+       }
+      ]
+     },
+     {
+      "name": "Scooter",
+      "description": "Shared vehicle",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "PK"
+       },
+       {
+        "name": "location",
+        "type": "GEOMETRY(Point, 4326)",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": true,
+        "description": "GPS"
+       }
+      ]
+     }
+    ],
+    "api_endpoints": [
+     {
+      "method": "POST",
+      "path": "/api/rides/start",
+      "description": "Start trip",
+      "request_body": "{scooter_id: string}",
+      "response_type": "RideStatus"
+     }
+    ],
+    "kafka_topics": [
+     {
+      "topic_name": "ride_events",
+      "description": "Trip lifecycle",
+      "payload_schema": {
+       "ride_id": "string",
+       "status": "string"
+      }
+     }
+    ],
+    "constraints": {
+     "stack": {
+      "backend": "C# 14",
+      "frontend": "Angular 20.1.6",
+      "mobile": "Kotlin 2.2.21",
+      "database": "PostgreSQL 17.9 + PostGIS",
+      "messaging": "Kafka",
+      "infrastructure": "Docker",
+      "ci_cd": "GitLab CI/CD"
+     },
+     "geo": "Urban zones with strict geofencing",
+     "external_services": [
+      "Payment Gateway",
+      "Mapbox API"
+     ]
+    },
+    "acceptance_criteria": [
+     "ST_Contains(zone_geom, scooter_location) executes in < 50ms",
+     "Ride start event published to Kafka within 200ms",
+     "API response time for scooter scan < 200ms p95"
+    ]
+   },
+   "attempts": 1,
+   "error": null
+  }
+ },
+ {
+  "id": 6,
+  "theme": "Банковское мобильное приложение (MVP)",
+  "text": "MVP мобильного банка. Клиент на Kotlin: авторизация, просмотр баланса, переводы между счетами, история операций. Бэкенд ASP.NET 10 Core с JWT-авторизацией. PostgreSQL 17.9 для хранения счетов и транзакций. Kafka для асинхронной обработки переводов. Админка Angular для поддержки. Docker, GitLab CI/CD.",
+  "seconds": 23.9,
+  "answer": {
+   "success": true,
+   "data": {
+    "project_name": "MVP Mobile Bank",
+    "domain": "FinTech / Digital Banking",
+    "description": "MVP мобильного банковского приложения, обеспечивающего клиентам базовые финансовые услуги: безопасную авторизацию, просмотр актуальных балансов счетов, выполнение переводов между счетами и просмотр детальной истории операций. Архитектура включает асинхронную обработку финансовых транзакций для обеспечения отказоустойчивости, а также веб-интерфейс для административной поддержки пользователей.",
+    "user_stories": [
+     {
+      "role": "Client",
+      "action": "logs in using credentials",
+      "so_that": "accessing «баланс» and «переводы»"
+     },
+     {
+      "role": "Client",
+      "action": "views current balances",
+      "so_that": "monitoring «баланс» across «счета»"
+     },
+     {
+      "role": "Client",
+      "action": "initiates «переводы» between «счета»",
+      "so_that": "transferring funds securely"
+     },
+     {
+      "role": "Client",
+      "action": "reviews «история операций»",
+      "so_that": "auditing past financial activities"
+     },
+     {
+      "role": "Admin",
+      "action": "uses «Angular» dashboard",
+      "so_that": "providing «поддержка» and managing accounts"
+     }
+    ],
+    "entities": [
+     {
+      "name": "User",
+      "description": "Client account with authentication credentials",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "PK"
+       },
+       {
+        "name": "email",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Login identifier"
+       },
+       {
+        "name": "password_hash",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Secured credentials"
+       }
+      ]
+     },
+     {
+      "name": "Account",
+      "description": "Financial account linked to a user",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "PK"
+       },
+       {
+        "name": "user_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": false,
+        "description": "FK to User"
+       },
+       {
+        "name": "balance",
+        "type": "DECIMAL",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Current funds"
+       }
+      ]
+     },
+     {
+      "name": "Transaction",
+      "description": "Record of fund movement between accounts",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "PK"
+       },
+       {
+        "name": "source_account_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": false,
+        "description": "FK to Account"
+       },
+       {
+        "name": "target_account_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": false,
+        "description": "FK to Account"
+       },
+       {
+        "name": "amount",
+        "type": "DECIMAL",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Transfer value"
+       },
+       {
+        "name": "status",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Processing state"
+       }
+      ]
+     }
+    ],
+    "api_endpoints": [
+     {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "description": "Client authorization",
+      "request_body": "{email: string, password: string}",
+      "response_type": "{access_token: string, expires_in: int}"
+     },
+     {
+      "method": "GET",
+      "path": "/api/accounts/balances",
+      "description": "Retrieve balances",
+      "request_body": null,
+      "response_type": "{accounts: [{id: string, balance: number}]}"
+     },
+     {
+      "method": "POST",
+      "path": "/api/transfers",
+      "description": "Execute inter-account transfer",
+      "request_body": "{source_account_id: string, target_account_id: string, amount: number}",
+      "response_type": "{transaction_id: string, status: string}"
+     },
+     {
+      "method": "GET",
+      "path": "/api/transactions/history",
+      "description": "Retrieve operation history",
+      "request_body": null,
+      "response_type": "{transactions: [{id: string, amount: number, status: string}]}"
+     },
+     {
+      "method": "PUT",
+      "path": "/api/admin/users/{user_id}/status",
+      "description": "Update user status",
+      "request_body": "{status: string}",
+      "response_type": "{updated: boolean}"
+     }
+    ],
+    "kafka_topics": [
+     {
+      "topic_name": "banking_transfers",
+      "description": "Asynchronous processing of transfers",
+      "payload_schema": {
+       "transaction_id": "string",
+       "source_account_id": "string",
+       "target_account_id": "string",
+       "amount": "number"
+      }
+     }
+    ],
+    "constraints": {
+     "stack": {
+      "backend": "ASP.NET 10 Core",
+      "frontend": "Angular",
+      "mobile": "Kotlin",
+      "database": "PostgreSQL 17.9",
+      "messaging": "Kafka",
+      "infrastructure": "Docker",
+      "ci_cd": "GitLab CI/CD"
+     },
+     "geo": "Not specified",
+     "external_services": []
+    },
+    "acceptance_criteria": [
+     "«авторизация» returns valid «JWT» token",
+     "«JWT» token validation occurs on protected endpoints",
+     "«баланс» retrieval reflects accurate «счета» data",
+     "«переводы» between «счета» update balances atomically",
+     "«история операций» displays completed and pending transfers",
+     "Transfers are published to Kafka for «асинхронной обработке»",
+     "«Angular» admin dashboard allows «поддержка» actions",
+     "Docker containers build and deploy via GitLab CI/CD"
+    ]
+   },
+   "attempts": 2,
+   "error": null
+  }
+ },
+ {
+  "id": 7,
+  "theme": "Платформа для онлайн-курсов",
+  "text": "Образовательная платформа. Мобильное приложение на Kotlin для просмотра курсов и видео. Бэкенд ASP.NET 10 Core (REST API, стриминг видео-ссылок). PostgreSQL для хранения курсов, уроков и прогресса. Angular-админка для преподавателей (загрузка контента, аналитика). Kafka для событий (просмотр урока, завершение курса). Docker Compose, GitLab CI/CD.",
+  "seconds": 39.6,
+  "answer": {
+   "success": true,
+   "data": {
+    "project_name": "EduStream",
+    "domain": "Education / Online Learning",
+    "description": "Образовательная платформа, позволяющая преподавателям загрузить учебный контент в виде курсов и уроков, а обучающимся просматривать видеоуроки и отслеживать свой прогресс. Система включает мобильное приложение для студентов, веб-интерфейс для преподавателей и стриминговый сервис.",
+    "user_stories": [
+     {
+      "role": "Студент",
+      "action": "открывает мобильное приложение",
+      "so_that": "может просматривать доступные курсы и видеоуроки"
+     },
+     {
+      "role": "Студент",
+      "action": "завершает просмотр видеоурока",
+      "so_that": "система фиксирует прогресс обучения"
+     },
+     {
+      "role": "Преподаватель",
+      "action": "загружает новый урок через админку",
+      "so_that": "контент становится доступен студентам"
+     },
+     {
+      "role": "Преподаватель",
+      "action": "просматривает аналитику",
+      "so_that": "отслеживает активность студентов"
+     }
+    ],
+    "entities": [
+     {
+      "name": "User",
+      "description": "Пользователь платформы",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Уникальный идентификатор пользователя"
+       },
+       {
+        "name": "role",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Роль пользователя: student, teacher"
+       },
+       {
+        "name": "full_name",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "ФИО пользователя"
+       },
+       {
+        "name": "email",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Email пользователя"
+       }
+      ]
+     },
+     {
+      "name": "Course",
+      "description": "Учебный курс",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Уникальный идентификатор курса"
+       },
+       {
+        "name": "title",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Название курса"
+       },
+       {
+        "name": "description",
+        "type": "TEXT",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": true,
+        "description": "Описание курса"
+       },
+       {
+        "name": "teacher_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": false,
+        "description": "ID преподавателя"
+       }
+      ]
+     },
+     {
+      "name": "Lesson",
+      "description": "Урок в курсе",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Уникальный идентификатор урока"
+       },
+       {
+        "name": "course_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": false,
+        "description": "ID курса"
+       },
+       {
+        "name": "title",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Название урока"
+       },
+       {
+        "name": "video_url",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Ссылка на видеофайл"
+       },
+       {
+        "name": "duration",
+        "type": "INTEGER",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Длительность в секундах"
+       }
+      ]
+     },
+     {
+      "name": "Progress",
+      "description": "Прогресс студента",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Уникальный идентификатор записи прогресса"
+       },
+       {
+        "name": "user_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": false,
+        "description": "ID студента"
+       },
+       {
+        "name": "lesson_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": false,
+        "description": "ID урока"
+       },
+       {
+        "name": "status",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Статус: in_progress, completed"
+       },
+       {
+        "name": "watched_seconds",
+        "type": "INTEGER",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Количество просматриваемых секунд"
+       }
+      ]
+     }
+    ],
+    "api_endpoints": [
+     {
+      "method": "GET",
+      "path": "/api/courses",
+      "description": "Получить список курсов",
+      "request_body": null,
+      "response_type": "Course[]"
+     },
+     {
+      "method": "GET",
+      "path": "/api/courses/{id}",
+      "description": "Получить курс с уроками",
+      "request_body": null,
+      "response_type": "CourseDetails"
+     },
+     {
+      "method": "GET",
+      "path": "/api/lessons/{id}/stream",
+      "description": "Получить ссылку на стриминг видео",
+      "request_body": null,
+      "response_type": "{stream_url: string}"
+     },
+     {
+      "method": "POST",
+      "path": "/api/progress",
+      "description": "Обновить прогресс просмотра",
+      "request_body": "{user_id: string, lesson_id: string, watched_seconds: int}",
+      "response_type": "Progress"
+     },
+     {
+      "method": "GET",
+      "path": "/api/analytics/courses/{id}",
+      "description": "Получить аналитику по курсу",
+      "request_body": null,
+      "response_type": "CourseAnalytics"
+     },
+     {
+      "method": "POST",
+      "path": "/api/courses/{id}/lessons",
+      "description": "Добавить урок",
+      "request_body": "{title: string, video_url: string, duration: int}",
+      "response_type": "Lesson"
+     }
+    ],
+    "kafka_topics": [
+     {
+      "topic_name": "lesson_watched",
+      "description": "Событие просмотра урока",
+      "payload_schema": {
+       "user_id": "string",
+       "lesson_id": "string",
+       "watched_seconds": "int",
+       "timestamp": "datetime"
+      }
+     },
+     {
+      "topic_name": "course_completed",
+      "description": "Событие завершения курса",
+      "payload_schema": {
+       "user_id": "string",
+       "course_id": "string",
+       "completed_at": "datetime"
+      }
+     }
+    ],
+    "constraints": {
+     "stack": {
+      "backend": "ASP.NET 10 Core",
+      "frontend": "Angular",
+      "mobile": "Kotlin",
+      "database": "PostgreSQL",
+      "messaging": "Kafka",
+      "infrastructure": "Docker Compose",
+      "ci_cd": "GitLab CI/CD"
+     },
+     "geo": "null",
+     "external_services": [
+      "Video Hosting / CDN"
+     ]
+    },
+    "acceptance_criteria": [
+     "Мобильное приложение на Kotlin позволяет просматривать курсы и видеоуроки",
+     "Бэкенд на ASP.NET 10 Core предоставляет REST API для работы с курсами и уроками",
+     "Система стриминга позволяет передавать видео-ссылки для просмотра",
+     "PostgreSQL хранит данные о курсах, уроках и прогрессе пользователей",
+     "Angular-админка позволяет преподавателям загружать контент",
+     "Аналитика в админке отображает данные о просматриваемых уроках",
+     "Kafka фиксирует события просмотра урока и завершения курса",
+     "Docker Compose запускает все сервисы платформы",
+     "GitLab CI/CD обеспечивает автоматизацию сборки и развертывания",
+     "API для обновления прогресса принимает watched_seconds и lesson_id",
+     "Событие lesson_watched публикуется в Kafka при каждом просмотре урока",
+     "Событие course_completed публикуется в Kafka при завершении курса"
+    ]
+   },
+   "attempts": 2,
+   "error": null
+  }
+ },
+ {
+  "id": 8,
+  "theme": "Система мониторинга серверов",
+  "text": "Внутренний сервис мониторинга серверов. Бэкенд ASP.NET 10 Core собирает метрики (CPU, RAM, диск) от агентов через REST, хранит в PostgreSQL 17.9. Kafka для алертов. Админка Angular с дашбордами и графиками. Мобильное приложение на Kotlin для push-уведомлений о падении серверов. Docker, GitLab CI/CD.",
+  "seconds": 60.4,
+  "answer": {
+   "success": true,
+   "data": {
+    "project_name": "Server Monitor Service",
+    "domain": "IT Operations / Infrastructure Monitoring",
+    "description": "Внутренний сервис мониторинга серверов, где агенты отправляют метрики (CPU, RAM, диск) через REST на бэкенд ASP.NET 10 Core. Система хранит данные в PostgreSQL 17.9, использует Kafka для алертов и предоставляет админку Angular с дашбордами и графиками, а также мобильное приложение на Kotlin для push-уведомлений о падении серверов. Развертывание — Docker, CI/CD — GitLab CI/CD.",
+    "user_stories": [
+     {
+      "role": "Admin",
+      "action": "views dashboards and graphs",
+      "so_that": "monitors server health in real time"
+     },
+     {
+      "role": "System",
+      "action": "collects metrics from agents via REST",
+      "so_that": "stores CPU, RAM, and disk data in PostgreSQL"
+     },
+     {
+      "role": "System",
+      "action": "publishes alerts to Kafka",
+      "so_that": "triggers notifications on server downtime"
+     },
+     {
+      "role": "Mobile User",
+      "action": "receives push notifications",
+      "so_that": "knows immediately when a server goes down"
+     },
+     {
+      "role": "Admin",
+      "action": "configures alert thresholds",
+      "so_that": "customizes monitoring sensitivity"
+     }
+    ],
+    "entities": [
+     {
+      "name": "Server",
+      "description": "Monitored server entity",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Primary key"
+       },
+       {
+        "name": "hostname",
+        "type": "VARCHAR(255)",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Server hostname"
+       },
+       {
+        "name": "ip_address",
+        "type": "VARCHAR(45)",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "IP address"
+       },
+       {
+        "name": "status",
+        "type": "VARCHAR(20)",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Current status (online/offline)"
+       },
+       {
+        "name": "last_seen",
+        "type": "TIMESTAMP",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": true,
+        "description": "Last agent heartbeat"
+       }
+      ]
+     },
+     {
+      "name": "Metric",
+      "description": "Collected metric data",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Primary key"
+       },
+       {
+        "name": "server_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": false,
+        "description": "FK to Server"
+       },
+       {
+        "name": "cpu_usage",
+        "type": "NUMERIC(5,2)",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": true,
+        "description": "CPU usage percentage"
+       },
+       {
+        "name": "ram_usage",
+        "type": "NUMERIC(5,2)",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": true,
+        "description": "RAM usage percentage"
+       },
+       {
+        "name": "disk_usage",
+        "type": "NUMERIC(5,2)",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": true,
+        "description": "Disk usage percentage"
+       },
+       {
+        "name": "collected_at",
+        "type": "TIMESTAMP",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Collection timestamp"
+       }
+      ]
+     },
+     {
+      "name": "Alert",
+      "description": "Generated alert",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Primary key"
+       },
+       {
+        "name": "server_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": false,
+        "description": "FK to Server"
+       },
+       {
+        "name": "alert_type",
+        "type": "VARCHAR(50)",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Type of alert (e.g., server_down)"
+       },
+       {
+        "name": "message",
+        "type": "TEXT",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Alert message"
+       },
+       {
+        "name": "severity",
+        "type": "VARCHAR(20)",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Severity level (critical, warning)"
+       },
+       {
+        "name": "created_at",
+        "type": "TIMESTAMP",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Creation timestamp"
+       },
+       {
+        "name": "resolved_at",
+        "type": "TIMESTAMP",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": true,
+        "description": "Resolution timestamp"
+       }
+      ]
+     },
+     {
+      "name": "Agent",
+      "description": "Monitoring agent",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Primary key"
+       },
+       {
+        "name": "server_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": false,
+        "description": "FK to Server"
+       },
+       {
+        "name": "version",
+        "type": "VARCHAR(20)",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Agent version"
+       },
+       {
+        "name": "last_heartbeat",
+        "type": "TIMESTAMP",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": true,
+        "description": "Last heartbeat timestamp"
+       }
+      ]
+     }
+    ],
+    "api_endpoints": [
+     {
+      "method": "POST",
+      "path": "/api/agents/metrics",
+      "description": "Agent submits metrics",
+      "request_body": "{server_id: string, cpu_usage: number, ram_usage: number, disk_usage: number, timestamp: string}",
+      "response_type": "Metric"
+     },
+     {
+      "method": "GET",
+      "path": "/api/servers",
+      "description": "List all monitored servers",
+      "request_body": null,
+      "response_type": "Server[]"
+     },
+     {
+      "method": "GET",
+      "path": "/api/servers/{id}/metrics",
+      "description": "Get metrics for a specific server",
+      "request_body": null,
+      "response_type": "Metric[]"
+     },
+     {
+      "method": "GET",
+      "path": "/api/alerts",
+      "description": "List all alerts",
+      "request_body": null,
+      "response_type": "Alert[]"
+     },
+     {
+      "method": "POST",
+      "path": "/api/servers",
+      "description": "Register a new server",
+      "request_body": "{hostname: string, ip_address: string}",
+      "response_type": "Server"
+     },
+     {
+      "method": "PUT",
+      "path": "/api/servers/{id}",
+      "description": "Update server details",
+      "request_body": "{hostname: string, ip_address: string}",
+      "response_type": "Server"
+     },
+     {
+      "method": "POST",
+      "path": "/api/alerts/{id}/resolve",
+      "description": "Resolve an alert",
+      "request_body": "{}",
+      "response_type": "Alert"
+     }
+    ],
+    "kafka_topics": [
+     {
+      "topic_name": "server_alerts",
+      "description": "Alerts about server status changes",
+      "payload_schema": {
+       "alert_id": "string",
+       "server_id": "string",
+       "server_hostname": "string",
+       "alert_type": "string",
+       "message": "string",
+       "severity": "string",
+       "timestamp": "string"
+      }
+     }
+    ],
+    "constraints": {
+     "stack": {
+      "backend": "ASP.NET 10 Core",
+      "frontend": "Angular",
+      "mobile": "Kotlin",
+      "database": "PostgreSQL 17.9",
+      "messaging": "Kafka",
+      "infrastructure": "Docker",
+      "ci_cd": "GitLab CI/CD"
+     },
+     "geo": null,
+     "external_services": []
+    },
+    "acceptance_criteria": [
+     "Agent successfully submits metrics (CPU, RAM, disk) via POST /api/agents/metrics",
+     "Metrics are stored in PostgreSQL 17.9 with correct server_id reference",
+     "Alerts are published to Kafka topic 'server_alerts' when a server goes offline",
+     "Mobile app receives push notifications via Kafka consumer within 5 seconds of alert publication",
+     "Admin dashboard displays real-time graphs for CPU, RAM, and disk usage",
+     "Server status updates to 'offline' if no agent heartbeat within configured threshold",
+     "Docker containers for backend, frontend, and database are built and deployed successfully",
+     "GitLab CI/CD pipeline passes for all services on commit"
+    ]
+   },
+   "attempts": 2,
+   "error": null
+  }
+ },
+ {
+  "id": 9,
+  "theme": "Медицинская запись к врачу",
+  "text": "Сервис записи к врачу. Мобильное приложение на Kotlin: выбор клиники, врача, слота, запись. Бэкенд ASP.NET 10 Core с расписанием врачей. PostgreSQL для хранения записей и слотов. Kafka для напоминаний о приёме. Angular-админка для клиник. Интеграция с mock-сервисом ЕМИАС. Docker + GitLab CI/CD.",
+  "seconds": 28.9,
+  "answer": {
+   "success": true,
+   "data": {
+    "project_name": "Medical Appointment Service",
+    "domain": "Healthcare / Appointment Scheduling",
+    "description": "Платформа записи к врачу, объединяющая мобильное приложение на Kotlin для пациентов и веб-администрирование на Angular для клиник. Система управляет расписанием врачей, слотами для записи, хранит данные в PostgreSQL, использует Kafka для отправки напоминаний о приёме и интегрируется с mock-сервисом ЕМИАС для синхронизации данных.",
+    "user_stories": [
+     {
+      "role": "Пациент",
+      "action": "выбирает клинику, врача и слот в мобильном приложении",
+      "so_that": "может записаться на приём"
+     },
+     {
+      "role": "Система",
+      "action": "публикует событие записи в Kafka",
+      "so_that": "напоминание о приёме отправляется пациенту"
+     },
+     {
+      "role": "Администратор клиники",
+      "action": "управляет расписанием врачей и слотами в Angular-админке",
+      "so_that": "клиника корректно обслуживает пациентов"
+     },
+     {
+      "role": "Система",
+      "action": "синхронизирует данные с mock-сервисом ЕМИАС",
+      "so_that": "записи дублируются в внешнюю систему"
+     },
+     {
+      "role": "Пациент",
+      "action": "получает напоминание о приёме",
+      "so_that": "не пропускает запланированную встречу"
+     }
+    ],
+    "entities": [
+     {
+      "name": "Clinic",
+      "description": "Медицинская клиника",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Идентификатор клиники"
+       },
+       {
+        "name": "name",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Название клиники"
+       }
+      ]
+     },
+     {
+      "name": "Doctor",
+      "description": "Врач клиники",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Идентификатор врача"
+       },
+       {
+        "name": "clinic_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": false,
+        "description": "Идентификатор клиники"
+       },
+       {
+        "name": "name",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Имя врача"
+       },
+       {
+        "name": "specialization",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Специализация"
+       }
+      ]
+     },
+     {
+      "name": "Slot",
+      "description": "Слот в расписании врача",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Идентификатор слота"
+       },
+       {
+        "name": "doctor_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": false,
+        "description": "Идентификатор врача"
+       },
+       {
+        "name": "start_time",
+        "type": "TIMESTAMP",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Начало слота"
+       },
+       {
+        "name": "duration_minutes",
+        "type": "INTEGER",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Длительность в минутах"
+       }
+      ]
+     },
+     {
+      "name": "Appointment",
+      "description": "Запись пациента на приём",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Идентификатор записи"
+       },
+       {
+        "name": "slot_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": false,
+        "description": "Идентификатор слота"
+       },
+       {
+        "name": "patient_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Идентификатор пациента"
+       },
+       {
+        "name": "status",
+        "type": "VARCHAR",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Статус записи (booked, cancelled)"
+       }
+      ]
+     },
+     {
+      "name": "Reminder",
+      "description": "Напоминание о приёме",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Идентификатор напоминания"
+       },
+       {
+        "name": "appointment_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": false,
+        "description": "Идентификатор записи"
+       },
+       {
+        "name": "sent_at",
+        "type": "TIMESTAMP",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": true,
+        "description": "Время отправки"
+       }
+      ]
+     }
+    ],
+    "api_endpoints": [
+     {
+      "method": "GET",
+      "path": "/api/clinics",
+      "description": "Получить список клиник",
+      "request_body": null,
+      "response_type": "List<Clinic>"
+     },
+     {
+      "method": "GET",
+      "path": "/api/doctors",
+      "description": "Получить врачей по клинике",
+      "request_body": null,
+      "response_type": "List<Doctor>"
+     },
+     {
+      "method": "GET",
+      "path": "/api/slots",
+      "description": "Получить свободные слоты по врачу",
+      "request_body": null,
+      "response_type": "List<Slot>"
+     },
+     {
+      "method": "POST",
+      "path": "/api/appointments",
+      "description": "Создать запись",
+      "request_body": "{slot_id: UUID, patient_id: UUID}",
+      "response_type": "Appointment"
+     },
+     {
+      "method": "GET",
+      "path": "/api/admin/doctors",
+      "description": "Получить список врачей для админки",
+      "request_body": null,
+      "response_type": "List<Doctor>"
+     },
+     {
+      "method": "POST",
+      "path": "/api/admin/slots",
+      "description": "Создать слот",
+      "request_body": "{doctor_id: UUID, start_time: TIMESTAMP, duration_minutes: INTEGER}",
+      "response_type": "Slot"
+     },
+     {
+      "method": "PATCH",
+      "path": "/api/admin/appointments/{id}",
+      "description": "Изменить статус записи",
+      "request_body": "{status: VARCHAR}",
+      "response_type": "Appointment"
+     }
+    ],
+    "kafka_topics": [
+     {
+      "topic_name": "appointment_reminders",
+      "description": "События для отправки напоминаний о приёме",
+      "payload_schema": {
+       "appointment_id": "UUID",
+       "patient_id": "UUID",
+       "scheduled_at": "TIMESTAMP"
+      }
+     }
+    ],
+    "constraints": {
+     "stack": {
+      "backend": "ASP.NET 10 Core",
+      "frontend": "Angular",
+      "mobile": "Kotlin",
+      "database": "PostgreSQL",
+      "messaging": "Kafka",
+      "infrastructure": "Docker",
+      "ci_cd": "GitLab CI/CD"
+     },
+     "geo": null,
+     "external_services": [
+      "mock-сервис ЕМИАС"
+     ]
+    },
+    "acceptance_criteria": [
+     "Мобильное приложение на Kotlin позволяет выбрать клинику, врача и слот для записи",
+     "Бэкенд на ASP.NET 10 Core управляет расписанием врачей и создаёт записи",
+     "Записи и слоты хранятся в базе данных PostgreSQL",
+     "Kafka публикует событие записи для отправки напоминания о приёме",
+     "Angular-админка позволяет клинике управлять расписанием врачей и слотами",
+     "Система интегрируется с mock-сервисом ЕМИАС для синхронизации записей",
+     "Сборка и деплой выполняются через Docker и GitLab CI/CD"
+    ]
+   },
+   "attempts": 1,
+   "error": null
+  }
+ },
+ {
+  "id": 10,
+  "theme": "Складской учёт (WMS)",
+  "text": "Система управления складом. Мобильное приложение на Kotlin для сканирования штрихкодов и перемещения товаров (ТСД). Бэкенд ASP.NET 10 Core. PostgreSQL 17.9 + PostGIS для координат ячеек. Kafka для событий приёмки/отгрузки. Angular-админка для управления номенклатурой и отчетами. Docker Compose, GitLab CI/CD.",
+  "seconds": 88.9,
+  "answer": {
+   "success": true,
+   "data": {
+    "project_name": "Warehouse Management System",
+    "domain": "Warehouse Management / Logistics",
+    "description": "Система управления складом, обеспечивающая мобильный учёт товаров через ТСД, геоприкрепление ячеек склада с использованием PostGIS, централизованное управление номенклатурой и отчетностью через веб-интерфейс, а также асинхронную обработку событий приёмки и отгрузки через Kafka.",
+    "user_stories": [
+     {
+      "role": "Warehouse Operator",
+      "action": "scans barcode on a device (ТСД)",
+      "so_that": "can update stock status and move goods between cells"
+     },
+     {
+      "role": "Admin",
+      "action": "manages item catalog and views reports in the Angular dashboard",
+      "so_that": "can control nomenclature and monitor warehouse operations"
+     },
+     {
+      "role": "System",
+      "action": "publishes inbound and outbound events to Kafka",
+      "so_that": "can asynchronously process receiving and shipping operations"
+     }
+    ],
+    "entities": [
+     {
+      "name": "Item",
+      "description": "Product nomenclature entry",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "PK"
+       },
+       {
+        "name": "sku",
+        "type": "VARCHAR(64)",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Barcode / SKU"
+       },
+       {
+        "name": "name",
+        "type": "VARCHAR(255)",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Product name"
+       }
+      ]
+     },
+     {
+      "name": "Cell",
+      "description": "Physical storage cell with geographic coordinates",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "PK"
+       },
+       {
+        "name": "code",
+        "type": "VARCHAR(32)",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Cell identifier"
+       },
+       {
+        "name": "location",
+        "type": "GEOMETRY(Point, 4326)",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "GPS coordinates of the cell"
+       }
+      ]
+     },
+     {
+      "name": "StockMove",
+      "description": "Movement record for an item between cells",
+      "fields": [
+       {
+        "name": "id",
+        "type": "UUID",
+        "is_pk": true,
+        "is_fk": false,
+        "nullable": false,
+        "description": "PK"
+       },
+       {
+        "name": "item_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": false,
+        "description": "FK to Item"
+       },
+       {
+        "name": "from_cell_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": true,
+        "description": "FK to source Cell"
+       },
+       {
+        "name": "to_cell_id",
+        "type": "UUID",
+        "is_pk": false,
+        "is_fk": true,
+        "nullable": false,
+        "description": "FK to destination Cell"
+       },
+       {
+        "name": "quantity",
+        "type": "INT",
+        "is_pk": false,
+        "is_fk": false,
+        "nullable": false,
+        "description": "Quantity moved"
+       }
+      ]
+     }
+    ],
+    "api_endpoints": [
+     {
+      "method": "POST",
+      "path": "/api/moves",
+      "description": "Record a stock movement between cells",
+      "request_body": "{item_id: string, from_cell_id: string, to_cell_id: string, quantity: integer}",
+      "response_type": "StockMove"
+     },
+     {
+      "method": "GET",
+      "path": "/api/cells/{id}",
+      "description": "Retrieve cell details including location",
+      "request_body": null,
+      "response_type": "Cell"
+     },
+     {
+      "method": "PUT",
+      "path": "/api/items/{id}",
+      "description": "Update item nomenclature",
+      "request_body": "{name: string, sku: string}",
+      "response_type": "Item"
+     },
+     {
+      "method": "POST",
+      "path": "/api/events/receiving",
+      "description": "Trigger receiving event for an inbound batch",
+      "request_body": "{item_id: string, cell_id: string, quantity: integer}",
+      "response_type": "void"
+     },
+     {
+      "method": "POST",
+      "path": "/api/events/shipping",
+      "description": "Trigger shipping event for an outbound batch",
+      "request_body": "{item_id: string, cell_id: string, quantity: integer}",
+      "response_type": "void"
+     }
+    ],
+    "kafka_topics": [
+     {
+      "topic_name": "inbound_events",
+      "description": "Inbound/receiving events",
+      "payload_schema": {
+       "item_id": "string",
+       "cell_id": "string",
+       "quantity": "integer",
+       "timestamp": "string"
+      }
+     },
+     {
+      "topic_name": "outbound_events",
+      "description": "Outbound/shipping events",
+      "payload_schema": {
+       "item_id": "string",
+       "cell_id": "string",
+       "quantity": "integer",
+       "timestamp": "string"
+      }
+     }
+    ],
+    "constraints": {
+     "stack": {
+      "backend": "ASP.NET 10 Core",
+      "frontend": "Angular",
+      "mobile": "Kotlin",
+      "database": "PostgreSQL 17.9 + PostGIS",
+      "messaging": "Kafka",
+      "infrastructure": "Docker Compose",
+      "ci_cd": "GitLab CI/CD"
+     },
+     "geo": "Geocoordinates of warehouse storage cells",
+     "external_services": []
+    },
+    "acceptance_criteria": [
+     "Mobile app (Kotlin) supports barcode scanning and goods movement via ТСД",
+     "ST_Distance(cell.location, target_point) is used to validate cell proximity during movements",
+     "ST_Contains(warehouse_boundary, cell.location) verifies all cells lie within warehouse perimeter",
+     "Angular admin dashboard allows managing nomenclature and viewing reports",
+     "Kafka topics 'inbound_events' and 'outbound_events' receive payloads within 200ms of triggering",
+     "All Docker Compose services start in under 10 seconds",
+     "GitLab CI/CD pipeline runs lint, tests, and build on every push to main"
+    ]
+   },
+   "attempts": 1,
+   "error": null
+  }
+ }
+]

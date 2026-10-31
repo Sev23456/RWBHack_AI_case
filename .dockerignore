@@ -1,0 +1,6 @@
+**/__pycache__
+**/node_modules
+**/.angular
+**/.git
+.env
+output

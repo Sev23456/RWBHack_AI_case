@@ -1,0 +1,14 @@
+# Публикует внутренние сервисы на хост для проверки через curl (только для отладки).
+# Запуск:  docker compose -f docker-compose.yml -f docker-compose.ports.yml up -d <сервис>
+# Внутри сети все сервисы слушают 8000.
+services:
+  analyst:       {ports: ["8101:8000"]}
+  planner:       {ports: ["8102:8000"]}
+  docs:          {ports: ["8103:8000"]}
+  backend-coder: {ports: ["8104:8000"]}
+  web-coder:     {ports: ["8105:8000"]}
+  backend:       {ports: ["8106:8000"]}
+  web:           {ports: ["8107:8000"]}
+  mobile:        {ports: ["8108:8000"]}
+  tester:        {ports: ["8109:8000"]}
+  orchestrator:  {ports: ["8110:8000"]}

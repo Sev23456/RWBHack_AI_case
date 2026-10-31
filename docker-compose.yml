@@ -1,0 +1,263 @@
+name: mas-pipeline
+services:
+  analyst:
+    build:
+      context: .
+      dockerfile: services/analyst/Dockerfile
+    restart: unless-stopped
+    environment:
+      LLM_URL: ${LLM_URL}
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_MODEL: ${LLM_MODEL:-qwen3.8-27b}
+    networks:
+    - runners
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://localhost:8000/health')
+      interval: 15s
+      timeout: 5s
+      retries: 5
+  planner:
+    build:
+      context: .
+      dockerfile: services/planner/Dockerfile
+    restart: unless-stopped
+    environment:
+      LLM_URL: ${LLM_URL}
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_MODEL: ${LLM_MODEL:-qwen3.8-27b}
+    networks:
+    - runners
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://localhost:8000/health')
+      interval: 15s
+      timeout: 5s
+      retries: 5
+  docs:
+    build:
+      context: .
+      dockerfile: services/docs/Dockerfile
+    restart: unless-stopped
+    environment:
+      LLM_URL: ${LLM_URL}
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_MODEL: ${LLM_MODEL:-qwen3.8-27b}
+    networks:
+    - runners
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://localhost:8000/health')
+      interval: 15s
+      timeout: 5s
+      retries: 5
+  orchestrator:
+    build:
+      context: .
+      dockerfile: services/orchestrator/Dockerfile
+    restart: unless-stopped
+    environment:
+      LLM_URL: ${LLM_URL}
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_MODEL: ${LLM_MODEL:-qwen3.8-27b}
+      OUTPUT_ROOT: /app/output
+      ANALYST_URL: http://analyst:8000
+      PLANNER_URL: http://planner:8000
+      DOCS_URL: http://docs:8000
+      # MOBILE отключён, пока его агент дорабатывается; включить — DISABLED_ROLES= (пусто) в .env
+      DISABLED_ROLES: ${DISABLED_ROLES-MOBILE}
+      BACKEND_URL: http://backend:8000
+      WEB_URL: http://web:8000
+      MOBILE_URL: http://mobile:8000
+      TESTER_URL: http://tester:8000
+    networks:
+    - runners
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://localhost:8000/health')
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    volumes:
+    - data:/app/output
+  backend:
+    build:
+      context: .
+      dockerfile: services/backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      LLM_URL: ${LLM_URL}
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_MODEL: ${LLM_MODEL:-qwen3.8-27b}
+      OUTPUT_ROOT: /app/output
+      AGENT_ROLE: BACKEND
+      CODER_URL: http://backend-coder:8000
+      TESTER_URL: http://tester:8000
+      MAX_REPAIR_ATTEMPTS: ${MAX_REPAIR_ATTEMPTS:-3}
+    networks:
+    - runners
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://localhost:8000/health')
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    volumes:
+    - data:/app/output
+  web:
+    build:
+      context: .
+      dockerfile: services/web/Dockerfile
+    restart: unless-stopped
+    environment:
+      LLM_URL: ${LLM_URL}
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_MODEL: ${LLM_MODEL:-qwen3.8-27b}
+      OUTPUT_ROOT: /app/output
+      AGENT_ROLE: WEB
+      CODER_URL: http://web-coder:8000
+      TESTER_URL: http://tester:8000
+      MAX_REPAIR_ATTEMPTS: ${MAX_REPAIR_ATTEMPTS:-3}
+    networks:
+    - runners
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://localhost:8000/health')
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    volumes:
+    - data:/app/output
+  mobile:
+    build:
+      context: .
+      dockerfile: services/mobile/Dockerfile
+    restart: unless-stopped
+    environment:
+      LLM_URL: ${LLM_URL}
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_MODEL: ${LLM_MODEL:-qwen3.8-27b}
+      OUTPUT_ROOT: /app/output
+      AGENT_ROLE: MOBILE
+      TESTER_URL: http://tester:8000
+      MAX_REPAIR_ATTEMPTS: ${MAX_REPAIR_ATTEMPTS:-3}
+    networks:
+    - runners
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://localhost:8000/health')
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    volumes:
+    - data:/app/output
+  backend-coder:
+    build:
+      context: .
+      dockerfile: services/backend/Dockerfile.coder
+    restart: unless-stopped
+    environment:
+      LLM_URL: ${LLM_URL}
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_MODEL: ${LLM_MODEL:-qwen3.8-27b}
+      AGENT_ROLE: BACKEND
+    networks:
+    - runners
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://localhost:8000/health')
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    volumes:
+    - data:/app/output
+  web-coder:
+    build:
+      context: .
+      dockerfile: services/web/Dockerfile.coder
+    restart: unless-stopped
+    environment:
+      LLM_URL: ${LLM_URL}
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_MODEL: ${LLM_MODEL:-qwen3.8-27b}
+      AGENT_ROLE: WEB
+    networks:
+    - runners
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://localhost:8000/health')
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    volumes:
+    - data:/app/output
+  tester:
+    build:
+      context: .
+      dockerfile: services/tester/Dockerfile
+    restart: unless-stopped
+    environment:
+      LLM_URL: ${LLM_URL}
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_MODEL: ${LLM_MODEL:-qwen3.8-27b}
+      OUTPUT_ROOT: /app/output
+      RUNNER_NETWORK: mas-runners
+      DATA_VOLUME: mas-data
+      ANDROID_RUNNER_IMAGE: mas-android-runner
+    networks:
+    - runners
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://localhost:8000/health')
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    volumes:
+    - data:/app/output
+    - /var/run/docker.sock:/var/run/docker.sock
+  ui:
+    build: ./ui
+    restart: unless-stopped
+    ports:
+    - ${UI_PORT:-8088}:80
+    networks:
+    - runners
+    depends_on:
+      orchestrator:
+        condition: service_healthy
+volumes:
+  data:
+    name: mas-data
+networks:
+  runners:
+    name: mas-runners
