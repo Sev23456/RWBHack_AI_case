@@ -1,0 +1,56 @@
+<div class="page-container">
+  <h1 class="page-title">Дашборд</h1>
+
+  <div class="cards-grid">
+    <mat-card class="metric-card">
+      <mat-card-content>
+        <div class="metric-value">1</div>
+        <div class="metric-label">Активные сессии</div>
+      </mat-card-content>
+    </mat-card>
+    <mat-card class="metric-card warning">
+      <mat-card-content>
+        <div class="metric-value">1</div>
+        <div class="metric-label">Заканчиваются</div>
+      </mat-card-content>
+    </mat-card>
+    <mat-card class="metric-card error">
+      <mat-card-content>
+        <div class="metric-value">0</div>
+        <div class="metric-label">Просрочены</div>
+      </mat-card-content>
+    </mat-card>
+    <mat-card class="metric-card accent">
+      <mat-card-content>
+        <div class="metric-value">150+</div>
+        <div class="metric-label">Зоны на карте</div>
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title>Последние сессии</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <table>
+        <thead>
+        <tr>
+          <th>Автомобиль</th>
+          <th>Зона</th>
+          <th>Окончание</th>
+          <th>Статус</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr *ngFor="let s of sessions()">
+          <td><strong>{{ s.plate }}</strong></td>
+          <td>{{ s.zone }}</td>
+          <td>{{ s.end }}</td>
+          <td><span class="badge" [class]="s.status">{{ s.status }}</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </mat-card-content>
+  </mat-card>
+</div>
